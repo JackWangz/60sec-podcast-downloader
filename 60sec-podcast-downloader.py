@@ -2,7 +2,7 @@
 author: JackWangz
 email : jy821022@gmail.com
 last update: 2017/03/17
-description: This prgram is specific for the website Scientific American.
+description: This program is used specifically for the website Scientific American's podcast page.
 '''
 try:
 	import threading
@@ -13,13 +13,12 @@ from bs4 import BeautifulSoup as Soup
 
 num_threads = 3
 num_files = 0
+
 idPool = queue.Queue()
-#Scientific American 60-Second Science Podcast
+historyId = []
 historyIdtoAdd = []
-threads = []
 
 def add_history(id, file_name):
-	global historyId
 	if id not in historyId:
 		print("store %s to history" % id)
 		historyIdtoAdd.append(id+'\n')
@@ -52,22 +51,7 @@ def download_podcast():
 
 def fetch_url(url, page_no):
 	payload = {'page': page_no}
-	return requests.get(url, params=payload)
-
-def main():
-	global historyId, historyIdtoAdd, idPool
-	time_start = time.time()
-	
-	url = "https://www.scientificamerican.com/podcasts/"
-	page_no = input("Insert a page number: ")
-	fetch_result = fetch_url(url, page_no)
-
-	if not os.path.exists('history.txt'):
-		print('create history.txt')
-		open('history.txt', 'w').close()
-
-	history_file = open('history.txt', 'r+')
-	historyId = history_file.read().splitlines()
+	fetch_result = requests.get(url, params=payload)
 
 	soup = Soup(fetch_result.text.encode(sys.stdin.encoding, 'replace').decode(sys.stdin.encoding), 'html.parser')
 	divArr = soup.find_all('div', attrs={"data-podcast-type": "gridded-podcast"})
@@ -78,6 +62,40 @@ def main():
 		title = filter_title(divArr[i]['data-podcast-title'])
 		add_history(podcast_id, title)
 
+def main():
+	global historyId, historyIdtoAdd, idPool
+	url = "https://www.scientificamerican.com/podcasts/"
+
+	time_start = time.time()
+	option = page_no_start = page_no_end = 0
+
+	if not os.path.exists('history.txt'):
+		print('create history.txt')
+		open('history.txt', 'w').close()
+
+	# read lines of Id from history records
+	history_file = open('history.txt', 'r+')
+	historyId = history_file.read().splitlines()
+
+	option = input("Which way to download:\n1) Certain page\n2) A range of pages\nYour choice: ")
+	if option == "1":
+		while True:
+			page_no_start = input("Insert a page number: ")
+			if str.isnumeric(page_no_start) > 0: break
+		# starting parsing url
+		fetch_url(url, int(page_no_start))
+	elif option == "2":
+
+			while True:
+				page_no_start = input("Starting page number: ")
+				page_no_end = input("Ending page number: ")
+				if str.isnumeric(page_no_start) and str.isnumeric(page_no_end):
+					if int(page_no_start) > 0 and int(page_no_end) > 0:
+						if int(page_no_end) > int(page_no_start): break
+
+			for page in range(int(page_no_start), int(page_no_end)+1):
+				fetch_url(url, page)
+
 	# if there are no files need to download
 	if not historyIdtoAdd:
 		print("No files here need to download")
@@ -85,7 +103,7 @@ def main():
 
 	print("====================================================")	
 	print("Start downloading")
-	time.sleep(2)
+	time.sleep(1)
 
 	# set threads
 	for i in range(num_threads):
